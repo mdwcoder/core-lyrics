@@ -8,6 +8,7 @@ import {
 } from '../lib/phonetics/rhymeDetector';
 import { FLOW_MARKER_CONFIG, FlowMarkerSelector } from './FlowMarkerSelector';
 import { rapAudioEngine } from '../lib/audio/metronome';
+import { formatTimestampTag } from '../lib/audio/beatAnalyzer';
 import {
   Plus,
   ChevronDown,
@@ -24,6 +25,8 @@ interface LyricEditorProps {
   activeRhymeHover: string | null;
   onRhymeHover: (letter: string | null) => void;
   onManualSave?: () => void;
+  bpm?: number;
+  timeOffset?: number;
 }
 
 const LINE_HEIGHT = 46; // Fixed line height for 100% synchronized gutter & in-place highlight
@@ -36,7 +39,9 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
   onFlowMarkerChange,
   activeRhymeHover,
   onRhymeHover,
-  onManualSave
+  onManualSave,
+  bpm = 90,
+  timeOffset = 0
 }) => {
   const [activeSelectorLine, setActiveSelectorLine] = useState<number | null>(null);
 
@@ -254,16 +259,32 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
             const alliteration = lineAnalysis?.alliteration;
             const mirror = lineAnalysis?.mirrorVerse;
 
+            const secPerBeat = 60.0 / (bpm || 90);
+            const secPerBar = secPerBeat * 4;
+            const lineTimeSec = (timeOffset || 0) + (idx * secPerBar);
+            const timestampTag = formatTimestampTag(lineTimeSec);
+            const mins = Math.floor(lineTimeSec / 60);
+            const secs = Math.floor(lineTimeSec % 60);
+            const timeBadge = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
             return (
               <div
                 key={idx}
                 style={{ height: `${LINE_HEIGHT}px` }}
                 className="flex items-center justify-between px-3 group hover:bg-[#131422] transition-colors gap-1.5"
               >
-                {/* Bar Number */}
-                <span className="text-[11px] font-code font-bold text-slate-500 group-hover:text-amber-400 transition-colors w-7 shrink-0">
-                  #{String(barNum).padStart(2, '0')}
-                </span>
+                {/* Bar Number & Timestamp Tag Badge */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-code font-bold text-slate-500 group-hover:text-amber-400 transition-colors w-7 shrink-0">
+                    #{String(barNum).padStart(2, '0')}
+                  </span>
+                  <span
+                    className="text-[9px] font-code text-slate-500 hover:text-amber-300 transition-colors cursor-default"
+                    title={`Marca de tiempo: ${timestampTag}`}
+                  >
+                    {timeBadge}
+                  </span>
+                </div>
 
                 {/* Syllable Counter Badge */}
                 <div

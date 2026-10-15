@@ -1,6 +1,7 @@
 /**
  * CORE-LYRICS · Rap Songwriting Studio
- * Live multi-syllabic rhyme analysis, syllable metric counter, and rhythm timeline.
+ * Live multi-syllabic rhyme analysis, syllable metric counter, rhythm timeline,
+ * client-side Web Audio BPM & onset detection, and //-//MM:SS:CC//-// timestamp export.
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -48,6 +49,11 @@ export default function App() {
 
   const [isTimelineOpen, setIsTimelineOpen] = useState<boolean>(false);
   const [bpm, setBpm] = useState<number>(90);
+  const [timeOffset, setTimeOffset] = useState<number>(() => {
+    const saved = localStorage.getItem('core_lyrics_time_offset');
+    return saved ? parseFloat(saved) : 0;
+  });
+
   const [activeRhymeHover, setActiveRhymeHover] = useState<string | null>(null);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [exportModalMode, setExportModalMode] = useState<'export' | 'import'>('export');
@@ -62,6 +68,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('core_lyrics_flow_markers', JSON.stringify(flowMarkers));
   }, [flowMarkers]);
+
+  useEffect(() => {
+    localStorage.setItem('core_lyrics_time_offset', String(timeOffset));
+  }, [timeOffset]);
 
   // Compute live phonetic analysis on every space, enter, or character change
   const songAnalysis: SongAnalysis = useMemo(() => {
@@ -78,11 +88,12 @@ export default function App() {
   const handleManualSave = useCallback(() => {
     localStorage.setItem('core_lyrics_lyrics', rawText);
     localStorage.setItem('core_lyrics_flow_markers', JSON.stringify(flowMarkers));
+    localStorage.setItem('core_lyrics_time_offset', String(timeOffset));
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 2000);
-  }, [rawText, flowMarkers]);
+  }, [rawText, flowMarkers, timeOffset]);
 
-  const handleImportProject = useCallback((project: { rawText: string; flowMarkers?: Record<number, FlowMarker>; bpm?: number }) => {
+  const handleImportProject = useCallback((project: { rawText: string; flowMarkers?: Record<number, FlowMarker>; bpm?: number; timeOffset?: number }) => {
     setRawText(project.rawText);
     if (project.flowMarkers) {
       setFlowMarkers(project.flowMarkers);
@@ -90,6 +101,10 @@ export default function App() {
     if (typeof project.bpm === 'number') {
       setBpm(project.bpm);
       rapAudioEngine.setBpm(project.bpm);
+    }
+    if (typeof project.timeOffset === 'number') {
+      setTimeOffset(project.timeOffset);
+      rapAudioEngine.setTimeOffset(project.timeOffset);
     }
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 2000);
@@ -139,7 +154,6 @@ Un flow indestructible para coronar el nivel`;
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey || e.altKey) && (e.code === 'Space' || e.key === ' ')) {
-        // Prevent default only if not focused inside an interactive control outside textarea
         e.preventDefault();
         rapAudioEngine.toggle();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -173,11 +187,15 @@ Un flow indestructible para coronar el nivel`;
         totalSyllables={songAnalysis.totalSyllables}
       />
 
-      {/* Optional Rhythm Timeline & Beat Sync (Disabled by default) */}
+      {/* Optional Rhythm Timeline & Beat Sync */}
       {isTimelineOpen && (
         <TimelineBar
           currentBarIndex={1}
           totalBars={songAnalysis.totalBars}
+          bpm={bpm}
+          onBpmChange={setBpm}
+          timeOffset={timeOffset}
+          onTimeOffsetChange={setTimeOffset}
         />
       )}
 
@@ -193,6 +211,8 @@ Un flow indestructible para coronar el nivel`;
           activeRhymeHover={activeRhymeHover}
           onRhymeHover={setActiveRhymeHover}
           onManualSave={handleManualSave}
+          bpm={bpm}
+          timeOffset={timeOffset}
         />
 
         {/* Sidebar Rhyme Inspector, Dictionary & Stats */}
@@ -211,6 +231,7 @@ Un flow indestructible para coronar el nivel`;
         analysis={songAnalysis}
         flowMarkers={flowMarkers}
         bpm={bpm}
+        timeOffset={timeOffset}
         initialMode={exportModalMode}
         onImportProject={handleImportProject}
       />

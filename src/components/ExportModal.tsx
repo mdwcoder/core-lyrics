@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SongAnalysis, FlowMarker } from '../lib/phonetics/rhymeDetector';
-import { X, Download, Copy, Check, FileJson, FileText, Music, UploadCloud } from 'lucide-react';
+import { formatTimestampTag } from '../lib/audio/beatAnalyzer';
+import { X, Download, Copy, Check, FileJson, FileText, Music, UploadCloud, Clock } from 'lucide-react';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface ExportModalProps {
   analysis: SongAnalysis;
   flowMarkers: Record<number, FlowMarker>;
   bpm: number;
+  timeOffset?: number;
   initialMode?: 'export' | 'import';
   onImportProject?: (project: { rawText: string; flowMarkers?: Record<number, FlowMarker>; bpm?: number }) => void;
 }
@@ -20,11 +22,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   analysis,
   flowMarkers,
   bpm,
+  timeOffset = 0,
   initialMode = 'export',
   onImportProject
 }) => {
   const [activeTab, setActiveTab] = useState<'export' | 'import'>(initialMode);
-  const [exportFormat, setExportFormat] = useState<'txt_metrics' | 'txt_clean' | 'json' | 'lrc'>('txt_metrics');
+  const [exportFormat, setExportFormat] = useState<'txt_timestamps' | 'txt_metrics' | 'txt_clean' | 'json' | 'lrc'>('txt_timestamps');
   const [copied, setCopied] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
@@ -55,32 +58,44 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   // Generate content based on selected format
   const generateExportContent = (): string => {
+    const secPerBeat = 60.0 / bpm;
+    const secPerBar = secPerBeat * 4;
+
+    if (exportFormat === 'txt_timestamps') {
+      let out = ``;
+      analysis.lines.forEach((l, idx) => {
+        const timeInSec = timeOffset + (idx * secPerBar);
+        const tag = formatTimestampTag(timeInSec);
+        out += `${tag} ${l.rawText}\n`;
+      });
+      return out;
+    }
+
     if (exportFormat === 'txt_clean') {
       return rawText;
     }
 
     if (exportFormat === 'txt_metrics') {
       let out = `CORE-LYRICS · LETRA Y MÉTRICA DE RAP\n`;
-      out += `BPM: ${bpm} | Total Barras: ${analysis.totalBars} | Total Sílabas: ${analysis.totalSyllables}\n`;
+      out += `BPM: ${bpm} | Offset Inicial: ${timeOffset}s | Total Barras: ${analysis.totalBars} | Total Sílabas: ${analysis.totalSyllables}\n`;
       out += `--------------------------------------------------------\n\n`;
 
-      analysis.lines.forEach((l) => {
+      analysis.lines.forEach((l, idx) => {
+        const timeInSec = timeOffset + (idx * secPerBar);
+        const tag = formatTimestampTag(timeInSec);
         const markerTag = l.flowMarker !== 'default' ? ` [${l.flowMarker.toUpperCase()}]` : '';
         const rhymeTag = l.rhymeLetter ? ` [RIMA ${l.rhymeLetter}]` : '';
-        out += `[#${String(l.barNumber).padStart(2, '0')}] (${String(l.metricSyllables).padStart(2, ' ')} síl)${markerTag}${rhymeTag}: ${l.rawText}\n`;
+        out += `${tag} [#${String(l.barNumber).padStart(2, '0')}] (${String(l.metricSyllables).padStart(2, ' ')} síl)${markerTag}${rhymeTag}: ${l.rawText}\n`;
       });
 
       return out;
     }
 
     if (exportFormat === 'lrc') {
-      // Generate synchronized LRC based on BPM (4 beats per bar)
-      const secPerBeat = 60.0 / bpm;
-      const secPerBar = secPerBeat * 4;
       let out = `[ti:Rap Track]\n[ar:MC]\n[al:CoreLyrics Project]\n[by:CoreLyrics Studio]\n`;
 
       analysis.lines.forEach((l, idx) => {
-        const timeInSec = idx * secPerBar;
+        const timeInSec = timeOffset + (idx * secPerBar);
         const mins = Math.floor(timeInSec / 60);
         const secs = Math.floor(timeInSec % 60);
         const hundredths = Math.floor((timeInSec % 1) * 100);
@@ -98,8 +113,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         title: "Rap Song Project",
         createdAt: new Date().toISOString(),
         bpm,
+        timeOffset,
         rawText,
         flowMarkers,
+        lines: analysis.lines.map((l, idx) => {
+          const timeInSec = timeOffset + (idx * secPerBar);
+          return {
+            bar: l.barNumber,
+            timestampTag: formatTimestampTag(timeInSec),
+            timeInSeconds: +timeInSec.toFixed(2),
+            text: l.rawText,
+            flowMarker: l.flowMarker,
+            rhymeLetter: l.rhymeLetter,
+            metricSyllables: l.metricSyllables
+          };
+        }),
         metrics: {
           totalBars: analysis.totalBars,
           totalSyllables: analysis.totalSyllables,
@@ -119,7 +147,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     let filename = 'letra_rap.txt';
     let mimeType = 'text/plain';
 
-    if (exportFormat === 'json') {
+    if (exportFormat === 'txt_timestamps') {
+      filename = 'letra_marcas_tiempo.txt';
+      mimeType = 'text/plain';
+    } else if (exportFormat === 'json') {
       filename = 'core_lyrics_proyecto.json';
       mimeType = 'application/json';
     } else if (exportFormat === 'lrc') {
@@ -144,10 +175,29 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleProcessImport = (jsonStr: string) => {
+  const handleProcessImport = (text: string) => {
     try {
       setImportError(null);
-      const parsed = JSON.parse(jsonStr);
+      const trimmed = text.trim();
+
+      // Check if it's text formatted with //-//MM:SS:CC//-// tags
+      if (!trimmed.startsWith('{') && trimmed.includes('//-//')) {
+        const lines = trimmed.split('\n');
+        const cleanLines = lines.map(line => {
+          return line.replace(/^\/\/\-\/\d{2}:\d{2}:\d{2}\/\/\-\s*(?:\[#\d+\]\s*\(\s*\d+\s*síl\)[^:]*:\s*)?/, '');
+        });
+
+        if (onImportProject) {
+          onImportProject({ rawText: cleanLines.join('\n') });
+        }
+
+        setImportSuccess(true);
+        setTimeout(() => onClose(), 1000);
+        return;
+      }
+
+      // JSON parsing
+      const parsed = JSON.parse(trimmed);
 
       let textToLoad = '';
       if (typeof parsed.rawText === 'string') {
@@ -174,7 +224,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         onClose();
       }, 1000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al parsear el archivo JSON.';
+      const msg = err instanceof Error ? err.message : 'Error al parsear el archivo o texto.';
       setImportError(msg);
     }
   };
@@ -221,7 +271,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               }`}
             >
               <UploadCloud className="w-4 h-4 text-emerald-400" />
-              <span>Importar Proyecto</span>
+              <span>Importar</span>
             </button>
           </div>
 
@@ -238,26 +288,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {activeTab === 'export' && (
           <div className="p-6 flex flex-col gap-4">
             {/* Format selector */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
+                { id: 'txt_timestamps', label: 'Marcas //-//', icon: Clock },
                 { id: 'txt_metrics', label: 'Texto + Métrica', icon: FileText },
                 { id: 'txt_clean', label: 'Texto Limpio', icon: FileText },
                 { id: 'json', label: 'Proyecto JSON', icon: FileJson },
-                { id: 'lrc', label: 'LRC Sincronizado', icon: Music }
+                { id: 'lrc', label: 'LRC Sync', icon: Music }
               ].map((f) => {
                 const Icon = f.icon;
                 return (
                   <button
                     key={f.id}
                     onClick={() => setExportFormat(f.id as typeof exportFormat)}
-                    className={`p-2.5 rounded-xl border text-xs font-urban-heading font-medium flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-2 rounded-xl border text-xs font-urban-heading font-medium flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                       exportFormat === f.id
                         ? 'bg-amber-400/15 border-amber-400 text-amber-300 font-bold'
                         : 'bg-[#151724] border-[#25273b] text-slate-400 hover:text-white hover:border-[#353852]'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    <span>{f.label}</span>
+                    <span className="text-[11px] text-center">{f.label}</span>
                   </button>
                 );
               })}
@@ -295,24 +346,24 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {activeTab === 'import' && (
           <div className="p-6 flex flex-col gap-4">
             <p className="text-xs text-slate-300">
-              Carga un archivo de proyecto exportado anteriormente en formato <strong className="text-amber-400">JSON</strong> (con barras, marcadores de flow y BPM) o pega su contenido a continuación.
+              Carga un archivo de proyecto en formato <strong className="text-amber-400">JSON</strong> o un texto con marcas de tiempo <strong className="text-cyan-400">//-//00:12:41//-//</strong>.
             </p>
 
             <div className="flex items-center gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json,application/json"
+                accept=".json,.txt,text/plain,application/json"
                 onChange={handleFileUpload}
                 className="hidden"
-                id="json-import-file"
+                id="import-file-input"
               />
               <label
-                htmlFor="json-import-file"
+                htmlFor="import-file-input"
                 className="px-4 py-2 bg-[#171926] hover:bg-[#202334] text-white border border-[#2b2d42] rounded-xl text-xs font-urban-heading font-semibold transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <FileJson className="w-4 h-4 text-amber-400" />
-                <span>Seleccionar archivo .json</span>
+                <span>Cargar archivo (.json o .txt)</span>
               </label>
               <span className="text-xs text-slate-500">o pega el texto abajo:</span>
             </div>
@@ -320,7 +371,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder="Pega aquí el contenido JSON del proyecto..."
+              placeholder="Pega aquí el JSON o texto con marcas //-//00:12:41//-//..."
               className="w-full h-48 p-3 bg-[#0a0b12] border border-[#212334] rounded-xl text-xs font-code text-slate-200 resize-none outline-none focus:border-amber-400"
             />
 
@@ -333,7 +384,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {importSuccess && (
               <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/50 text-emerald-400 text-xs font-urban-heading flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>¡Proyecto cargado con éxito en el editor!</span>
+                <span>¡Contenido cargado con éxito en el editor!</span>
               </div>
             )}
 

@@ -24,21 +24,25 @@
 - **Métrica Poética & de Rap**:
   - Cálculo de sílabas métricas considerando **sinalefas** entre palabras contiguas.
   - Ajuste automático por acentuación final: Aguda (`+1`), Llana (`0`), Esdrújula (`-1`), Sobresdrújula (`-2`).
-- **Timeline Rítmico & Metrónomo Web Audio**:
-  - BPM configurable (40 a 240 BPM) con presets de género (BoomBap 85, Clásico 90, Trap 120, Drill 140).
-  - Tap tempo interactivo.
-  - Carga de pistas instrumentales locales (`.mp3`, `.wav`) con barra de desplazamiento (scrubber) y control de volumen.
-  - Pausa y reanudación precisa sin reinicios accidentales.
+- **Timeline Rítmico & Detección Automática en el Cliente (Sin Backend)**:
+  - **Auto-detección de BPM**: Analiza el archivo de audio directamente en el navegador con la Web Audio API (filtro pasabajo y picos de bombo/transitorios), estimando el tempo sin necesidad de ningún servidor.
+  - **Detección del inicio del beat / Drop**: Identifica en qué segundo entra el ritmo o bombo principal para calcular y sincronizar automáticamente el `offset` inicial.
+  - BPM configurable (40 a 240 BPM) con presets de género (BoomBap 85, Clásico 90, Trap 120, Drill 140) y tap tempo manual.
+  - Carga de pistas instrumentales locales (`.mp3`, `.wav`) con barra de desplazamiento (scrubber), control de volumen y auto-análisis con un clic.
+- **Marcas de Tiempo Sincronizadas (`//-//00:12:41//-//`)**:
+  - Estructura de marcas de tiempo por verso: `//-//MM:SS:CC//-//` (minutos : segundos : centésimas).
+  - Visualización del tiempo de entrada de cada barra en el margen del editor para cuadrar la letra a la perfección.
+  - Exportación e importación directa en este formato estructurado para notas o DAWs.
 - **Marcadores de Flow**:
   - Marcadores rítmicos por barra: 4/4 Estándar, Tresillos / Triplet flow, Doble tempo, Pausa / Punchline break y Flow melódico.
 - **Buscador & Diccionario de Rimas Integrado**:
   - Vocabulario curado de cientos de términos urbanos, poéticos y de competición.
-- **Exportación e Importación**:
+- **Exportación e Importación Multiformato**:
+  - Texto con Marcas de Tiempo estructuradas (`//-//00:12:41//-//`)
   - Letra limpia (`.txt`)
   - Letra con métrica detallada y marcadores (`.txt`)
-  - Letras sincronizadas con marcas de tiempo (`.lrc`)
-  - Proyecto completo en JSON (`.json`) para copia de seguridad o migración.
-  - Importación directa de archivos `.json` al editor.
+  - Letras sincronizadas Karaoke (`.lrc`)
+  - Proyecto completo en JSON (`.json`) e importación bidireccional.
 
 ---
 

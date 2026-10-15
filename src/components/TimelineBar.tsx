@@ -1,16 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, Upload, Trash2, RotateCcw } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Upload, Trash2, RotateCcw, Sparkles, Loader2, Check } from 'lucide-react';
 import { rapAudioEngine, MetronomeState } from '../lib/audio/metronome';
+import { analyzeBeatFromAudioFile, formatTimestampTag } from '../lib/audio/beatAnalyzer';
 
 interface TimelineBarProps {
   currentBarIndex: number;
   totalBars: number;
+  bpm: number;
+  onBpmChange: (bpm: number) => void;
+  timeOffset: number;
+  onTimeOffsetChange: (offset: number) => void;
 }
 
-export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _currentBarIndex, totalBars: _totalBars }) => {
+export const TimelineBar: React.FC<TimelineBarProps> = ({
+  currentBarIndex: _currentBarIndex,
+  totalBars: _totalBars,
+  bpm,
+  onBpmChange,
+  timeOffset,
+  onTimeOffsetChange
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(90);
-  const [timeOffset, setTimeOffset] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
@@ -21,10 +31,15 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
   const [currentTime, setCurrentTime] = useState(0);
   const [audioFileName, setAudioFileName] = useState('');
 
-  // Tap tempo state
+  // Audio beat analyzer states
+  const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
+  const [analysisResultMsg, setAnalysisResultMsg] = useState<string | null>(null);
+
+  // References
   const tapTimesRef = useRef<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const uploadedFileRef = useRef<File | null>(null);
 
   useEffect(() => {
     rapAudioEngine.setOnTick((beat, bar) => {
@@ -34,8 +49,8 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
 
     rapAudioEngine.setOnStateChange((state: Partial<MetronomeState>) => {
       if (state.isPlaying !== undefined) setIsPlaying(state.isPlaying);
-      if (state.bpm !== undefined) setBpm(state.bpm);
-      if (state.timeOffset !== undefined) setTimeOffset(state.timeOffset);
+      if (state.bpm !== undefined && state.bpm !== bpm) onBpmChange(state.bpm);
+      if (state.timeOffset !== undefined && state.timeOffset !== timeOffset) onTimeOffsetChange(state.timeOffset);
       if (state.isMuted !== undefined) setIsMuted(state.isMuted);
       if (state.volume !== undefined) setVolume(state.volume);
       if (state.currentBeat !== undefined) setCurrentBeat(state.currentBeat);
@@ -48,7 +63,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
     return () => {
       rapAudioEngine.pause();
     };
-  }, []);
+  }, [bpm, onBpmChange, timeOffset, onTimeOffsetChange]);
 
   const handleTogglePlay = () => {
     rapAudioEngine.toggle();
@@ -58,9 +73,9 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
     rapAudioEngine.restart();
   };
 
-  const handleBpmChange = (newBpm: number) => {
+  const handleBpmUpdate = (newBpm: number) => {
     const val = Math.max(40, Math.min(240, newBpm));
-    setBpm(val);
+    onBpmChange(val);
     rapAudioEngine.setBpm(val);
   };
 
@@ -69,7 +84,6 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
     const taps = tapTimesRef.current;
     taps.push(now);
 
-    // Keep only taps within the last 3 seconds
     const recent = taps.filter(t => now - t < 3000);
     tapTimesRef.current = recent;
 
@@ -81,14 +95,14 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
       const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
       const calculatedBpm = Math.round(60000 / avgInterval);
       if (calculatedBpm >= 40 && calculatedBpm <= 240) {
-        handleBpmChange(calculatedBpm);
+        handleBpmUpdate(calculatedBpm);
       }
     }
   };
 
-  const handleOffsetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value) || 0;
-    setTimeOffset(val);
+  const handleOffsetUpdate = (newOffset: number) => {
+    const val = Math.max(0, newOffset);
+    onTimeOffsetChange(val);
     rapAudioEngine.setTimeOffset(val);
   };
 
@@ -103,17 +117,40 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
     rapAudioEngine.setVolume(newVol);
   };
 
+  const runBeatAnalysis = async (file: File) => {
+    setIsAnalyzingBeat(true);
+    setAnalysisResultMsg(null);
+
+    try {
+      const result = await analyzeBeatFromAudioFile(file);
+      handleBpmUpdate(result.bpm);
+      handleOffsetUpdate(result.startOffset);
+
+      const tag = formatTimestampTag(result.startOffset);
+      setAnalysisResultMsg(`✓ Auto-detectado: ${result.bpm} BPM · Inicio: ${result.startOffset}s (${tag})`);
+    } catch (err) {
+      console.warn('Error analyzing audio beat client-side:', err);
+      setAnalysisResultMsg('No se pudo determinar el tempo automáticamente.');
+    } finally {
+      setIsAnalyzingBeat(false);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      uploadedFileRef.current = file;
       setAudioFileName(file.name);
       rapAudioEngine.loadAudioFile(file);
+      runBeatAnalysis(file);
     }
   };
 
   const handleRemoveAudio = () => {
     rapAudioEngine.removeAudioFile();
+    uploadedFileRef.current = null;
     setAudioFileName('');
+    setAnalysisResultMsg(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -138,7 +175,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
   const progressPercent = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0;
 
   return (
-    <div className="w-full bg-[#10111a] border-b border-[#232536] px-6 py-3 transition-all duration-200">
+    <div className="w-full bg-[#10111a] border-b border-[#232536] px-4 sm:px-6 py-3 transition-all duration-200">
       <div className="max-w-7xl mx-auto flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Left Section: Transport Controls & Metronome */}
@@ -175,7 +212,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
                 min={40}
                 max={240}
                 value={bpm}
-                onChange={(e) => handleBpmChange(parseInt(e.target.value) || 90)}
+                onChange={(e) => handleBpmUpdate(parseInt(e.target.value) || 90)}
                 className="w-14 bg-[#0d0e16] border border-[#30334d] text-center text-sm font-code font-bold text-amber-300 rounded px-1.5 py-1 focus:outline-none focus:border-amber-400"
               />
               <button
@@ -197,7 +234,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
               ].map(p => (
                 <button
                   key={p.val}
-                  onClick={() => handleBpmChange(p.val)}
+                  onClick={() => handleBpmUpdate(p.val)}
                   className={`text-[11px] px-2 py-1 rounded transition-colors cursor-pointer font-code ${
                     bpm === p.val
                       ? 'bg-amber-400/15 text-amber-300 border border-amber-400/30 font-bold'
@@ -286,21 +323,21 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
             {/* Base start offset in seconds */}
             <div className="flex items-center bg-[#171926] border border-[#2b2d42] rounded-lg px-2.5 py-1 gap-2">
               <span className="text-[11px] text-slate-400 whitespace-nowrap">
-                Inicio de base:
+                Inicio base:
               </span>
               <input
                 type="number"
                 step={0.1}
                 min={0}
                 value={timeOffset}
-                onChange={handleOffsetChange}
+                onChange={(e) => handleOffsetUpdate(parseFloat(e.target.value) || 0)}
                 className="w-14 bg-[#0d0e16] border border-[#30334d] text-center text-xs font-code font-bold text-cyan-300 rounded px-1 py-0.5 focus:outline-none focus:border-cyan-400"
-                title="Offset en segundos antes del primer golpe"
+                title="Offset en segundos antes de que empiece el primer compás"
               />
               <span className="text-[10px] text-slate-500 font-code">seg</span>
             </div>
 
-            {/* Audio instrumental file loader */}
+            {/* Audio instrumental file loader and auto-analysis */}
             <div className="flex items-center gap-2">
               <input
                 ref={fileInputRef}
@@ -313,7 +350,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
 
               {hasAudioFile ? (
                 <div className="flex items-center gap-2 bg-cyan-950/30 border border-cyan-800/40 rounded-lg px-3 py-1">
-                  <div className="max-w-[140px] truncate text-xs text-cyan-300 font-medium" title={audioFileName}>
+                  <div className="max-w-[130px] truncate text-xs text-cyan-300 font-medium" title={audioFileName}>
                     {audioFileName}
                   </div>
                   {audioDuration > 0 && (
@@ -321,6 +358,25 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
                       {formatTime(currentTime)} / {formatTime(audioDuration)}
                     </span>
                   )}
+
+                  {/* Re-analyze button */}
+                  <button
+                    onClick={() => {
+                      if (uploadedFileRef.current) {
+                        runBeatAnalysis(uploadedFileRef.current);
+                      }
+                    }}
+                    disabled={isAnalyzingBeat}
+                    className="p-1 hover:text-amber-300 text-slate-400 transition-colors cursor-pointer disabled:opacity-50"
+                    title="Auto-detectar BPM e inicio del beat con Web Audio"
+                  >
+                    {isAnalyzingBeat ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    )}
+                  </button>
+
                   <button
                     onClick={handleRemoveAudio}
                     className="p-1 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
@@ -333,15 +389,33 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({ currentBarIndex: _curr
                 <label
                   htmlFor="audio-upload"
                   className="px-3 py-1.5 text-xs font-urban-heading font-medium bg-[#171926] hover:bg-[#202334] text-slate-300 hover:text-white border border-[#2b2d42] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Carga una instrumental MP3 o WAV para escribir sobre ella"
+                  title="Carga una instrumental MP3 o WAV (analiza BPM e inicio 100% en el cliente)"
                 >
                   <Upload className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Cargar Instrumental</span>
+                  <span>Subir Base (Auto BPM)</span>
                 </label>
               )}
             </div>
           </div>
         </div>
+
+        {/* Audio Analysis Feedback Badge */}
+        {isAnalyzingBeat && (
+          <div className="flex items-center gap-2 text-xs font-code text-amber-300 bg-amber-950/30 border border-amber-500/30 px-3 py-1.5 rounded-lg animate-pulse">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Analizando transitorios de bombo y tempo en el navegador (Web Audio API)...</span>
+          </div>
+        )}
+
+        {!isAnalyzingBeat && analysisResultMsg && (
+          <div className="flex items-center justify-between gap-2 text-xs font-code text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 px-3 py-1.5 rounded-lg">
+            <div className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{analysisResultMsg}</span>
+            </div>
+            <span className="text-[10px] text-slate-400">Configurado automáticamente</span>
+          </div>
+        )}
 
         {/* Audio Scrubber / Seek Bar (visible when audio file is loaded) */}
         {hasAudioFile && audioDuration > 0 && (
