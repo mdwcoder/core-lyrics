@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#090A0F"/>
+  <rect x="32" y="32" width="448" height="448" rx="96" stroke="url(#gradient)" stroke-width="16" fill="#0D0E17"/>
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="50%" stop-color="#F43F5E"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Beamed Music Note -->
+  <!-- Left Note -->
+  <ellipse cx="190" cy="340" rx="45" ry="34" transform="rotate(-15 190 340)" fill="#FBBF24"/>
+  <!-- Right Note -->
+  <ellipse cx="320" cy="295" rx="45" ry="34" transform="rotate(-15 320 295)" fill="#06B6D4"/>
+  <!-- Stems -->
+  <rect x="220" y="160" width="18" height="170" rx="4" fill="#FBBF24"/>
+  <rect x="350" y="125" width="18" height="160" rx="4" fill="#06B6D4"/>
+  <!-- Connecting Beam -->
+  <polygon points="220,160 368,125 368,160 220,195" fill="#F43F5E"/>
+</svg>

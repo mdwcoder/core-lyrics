@@ -11,13 +11,15 @@ import { LyricEditor } from './components/LyricEditor';
 import { RhymeInspector } from './components/RhymeInspector';
 import { ExportModal } from './components/ExportModal';
 import { HelpModal } from './components/HelpModal';
+import { InstallModal } from './components/InstallModal';
+import { usePwaInstall } from './lib/pwa/usePwaInstall';
 import {
   analyzeSongLyrics,
   FlowMarker,
   SongAnalysis
 } from './lib/phonetics/rhymeDetector';
 import { rapAudioEngine } from './lib/audio/metronome';
-import { Check } from 'lucide-react';
+import { Check, PenTool, Sparkles, Music2 } from 'lucide-react';
 
 // Default demo displaying authentic Spanish rap techniques: alliteration, retruécano, multi-syllabic and compound schemes
 const DEMO_LYRICS = `Rompo ritmos rudos con rimas reales
@@ -159,6 +161,20 @@ export default function App() {
   const [exportModalMode, setExportModalMode] = useState<'export' | 'import'>('export');
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<boolean>(false);
+
+  // Mobile UX: Active View Tab (Editor, Rhymes/Dictionary, Beat)
+  const [mobileTab, setMobileTab] = useState<'editor' | 'rhymes' | 'beat'>('editor');
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
+
+  // PWA Installation Hook
+  const {
+    canInstall,
+    isInstalled,
+    isIOS,
+    showIOSModal,
+    setShowIOSModal,
+    promptInstall
+  } = usePwaInstall();
 
   // Auto-save changes to localStorage (migrated to core_lyrics namespace)
   useEffect(() => {
@@ -312,8 +328,18 @@ Un flow indestructible para coronar el nivel`;
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [handleManualSave, handleUndo, handleRedo]);
 
+  const handleToggleTimeline = useCallback(() => {
+    setIsTimelineOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setMobileTab('beat');
+      }
+      return next;
+    });
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#090a0f] text-[#f3f4f6] flex flex-col selection:bg-amber-400 selection:text-black relative">
+    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] bg-[#090a0f] text-[#f3f4f6] flex flex-col selection:bg-amber-400 selection:text-black relative overflow-hidden">
       {/* Top Navigation */}
       <TopBar
         onNewSong={handleNewSong}
@@ -328,54 +354,122 @@ Un flow indestructible para coronar el nivel`;
         }}
         onOpenHelp={() => setIsHelpOpen(true)}
         isTimelineOpen={isTimelineOpen}
-        onToggleTimeline={() => setIsTimelineOpen(!isTimelineOpen)}
+        onToggleTimeline={handleToggleTimeline}
         totalBars={songAnalysis.totalBars}
         totalSyllables={songAnalysis.totalSyllables}
         canUndo={past.length > 0}
         canRedo={future.length > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onOpenInstall={() => {
+          if (canInstall && !isIOS) {
+            promptInstall();
+          } else {
+            setIsInstallModalOpen(true);
+          }
+        }}
+        canInstall={canInstall}
+        isAppInstalled={isInstalled}
       />
 
-      {/* Optional Rhythm Timeline & Beat Sync */}
+      {/* Desktop Timeline Bar (Hidden on mobile to preserve screen space) */}
       {isTimelineOpen && (
-        <TimelineBar
-          currentBarIndex={1}
-          totalBars={songAnalysis.totalBars}
-          bpm={bpm}
-          onBpmChange={setBpm}
-          timeOffset={timeOffset}
-          onTimeOffsetChange={setTimeOffset}
-        />
+        <div className="hidden md:block shrink-0">
+          <TimelineBar
+            currentBarIndex={1}
+            totalBars={songAnalysis.totalBars}
+            bpm={bpm}
+            onBpmChange={setBpm}
+            timeOffset={timeOffset}
+            onTimeOffsetChange={setTimeOffset}
+          />
+        </div>
       )}
 
-      {/* Workspace: Lyric Editor & Rhyme Inspector */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Main Bar Worksheet Editor */}
-        <LyricEditor
-          rawText={rawText}
-          analysis={songAnalysis}
-          onTextChange={handleTextChange}
-          flowMarkers={flowMarkers}
-          onFlowMarkerChange={handleFlowMarkerChange}
-          activeRhymeHover={activeRhymeHover}
-          onRhymeHover={setActiveRhymeHover}
-          onManualSave={handleManualSave}
-          bpm={bpm}
-          timeOffset={timeOffset}
-          canUndo={past.length > 0}
-          canRedo={future.length > 0}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-        />
+      {/* Workspace: Dual-Pane Desktop vs Responsive Mobile View Tabs */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Tab 1: Lyric Editor */}
+        <div className={`flex-1 flex flex-col h-full overflow-hidden ${mobileTab === 'editor' ? 'flex' : 'hidden md:flex'}`}>
+          <LyricEditor
+            rawText={rawText}
+            analysis={songAnalysis}
+            onTextChange={handleTextChange}
+            flowMarkers={flowMarkers}
+            onFlowMarkerChange={handleFlowMarkerChange}
+            activeRhymeHover={activeRhymeHover}
+            onRhymeHover={setActiveRhymeHover}
+            onManualSave={handleManualSave}
+            bpm={bpm}
+            timeOffset={timeOffset}
+            canUndo={past.length > 0}
+            canRedo={future.length > 0}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+          />
+        </div>
 
-        {/* Sidebar Rhyme Inspector, Dictionary & Stats */}
-        <RhymeInspector
-          analysis={songAnalysis}
-          activeRhymeHover={activeRhymeHover}
-          onRhymeHover={setActiveRhymeHover}
-        />
+        {/* Tab 2: Rhyme Inspector, Dictionary & Rap Techniques */}
+        <div className={`h-full overflow-hidden ${mobileTab === 'rhymes' ? 'flex w-full' : 'hidden md:flex'}`}>
+          <RhymeInspector
+            analysis={songAnalysis}
+            activeRhymeHover={activeRhymeHover}
+            onRhymeHover={setActiveRhymeHover}
+          />
+        </div>
+
+        {/* Tab 3: Dedicated Beat Timeline on Mobile */}
+        {mobileTab === 'beat' && (
+          <div className="md:hidden flex-1 flex flex-col h-full overflow-y-auto bg-[#0d0e16]">
+            <TimelineBar
+              currentBarIndex={1}
+              totalBars={songAnalysis.totalBars}
+              bpm={bpm}
+              onBpmChange={setBpm}
+              timeOffset={timeOffset}
+              onTimeOffsetChange={setTimeOffset}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Mobile Bottom Navigation Bar (Ergonomic Thumb Switcher) */}
+      <nav className="md:hidden flex items-center justify-around bg-[#0c0d16]/98 backdrop-blur-md border-t border-[#232536] px-2 py-1.5 pb-safe z-30 shrink-0">
+        <button
+          onClick={() => setMobileTab('editor')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            mobileTab === 'editor'
+              ? 'text-amber-400 font-bold bg-amber-400/10 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <PenTool className="w-4 h-4" />
+          <span className="text-[10px] font-urban-heading">Letra ({songAnalysis.totalBars})</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('rhymes')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            mobileTab === 'rhymes'
+              ? 'text-cyan-400 font-bold bg-cyan-400/10 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="text-[10px] font-urban-heading">Rimas & Diccionario</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('beat')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            mobileTab === 'beat'
+              ? 'text-rose-400 font-bold bg-rose-400/10 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Music2 className="w-4 h-4" />
+          <span className="text-[10px] font-urban-heading">Beat ({bpm} BPM)</span>
+        </button>
+      </nav>
 
       {/* Modals */}
       <ExportModal
@@ -395,9 +489,20 @@ Un flow indestructible para coronar el nivel`;
         onClose={() => setIsHelpOpen(false)}
       />
 
+      <InstallModal
+        isOpen={isInstallModalOpen || showIOSModal}
+        onClose={() => {
+          setIsInstallModalOpen(false);
+          setShowIOSModal(false);
+        }}
+        isIOS={isIOS}
+        onNativeInstall={promptInstall}
+        canNativeInstall={canInstall && !isIOS}
+      />
+
       {/* Save Toast Notification */}
       {saveToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#161828] border border-amber-400/50 shadow-2xl shadow-amber-400/20 text-white px-4 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-urban-heading font-bold animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-16 md:bottom-6 right-6 z-50 bg-[#161828] border border-amber-400/50 shadow-2xl shadow-amber-400/20 text-white px-4 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-urban-heading font-bold animate-in fade-in slide-in-from-bottom-2 duration-200">
           <div className="w-5 h-5 rounded-full bg-amber-400 text-black flex items-center justify-center">
             <Check className="w-3.5 h-3.5 stroke-[3]" />
           </div>

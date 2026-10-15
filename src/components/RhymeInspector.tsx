@@ -52,7 +52,7 @@ export const RhymeInspector: React.FC<RhymeInspectorProps> = ({
   };
 
   return (
-    <aside className="w-80 lg:w-96 bg-[#0c0d15] border-l border-[#202232] flex flex-col h-full shrink-0">
+    <aside className="w-full md:w-80 lg:w-96 bg-[#0c0d15] border-l border-[#202232] flex flex-col h-full shrink-0 overflow-y-auto">
       {/* Sidebar Tabs */}
       <div className="flex items-center border-b border-[#202232] bg-[#0e0f17] p-1 gap-1">
         <button

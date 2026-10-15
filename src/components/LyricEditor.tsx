@@ -13,7 +13,11 @@ import {
   Plus,
   ChevronDown,
   Flame,
-  Repeat
+  Repeat,
+  Undo2,
+  Redo2,
+  Play,
+  Pause
 } from 'lucide-react';
 
 interface LyricEditorProps {
@@ -263,7 +267,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
         {/* LEFT GUTTER: Bar Numbers, Syllables, Flow Markers & Alliteration Badges */}
         <div
           ref={gutterLeftRef}
-          className="w-52 md:w-64 bg-[#0b0c14] border-r border-[#1f2130] shrink-0 overflow-hidden select-none py-4"
+          className="w-14 sm:w-16 md:w-64 bg-[#0b0c14] border-r border-[#1f2130] shrink-0 overflow-hidden select-none py-4"
         >
           {lines.map((lineText, idx) => {
             const isBlank = lineText.trim().length === 0;
@@ -276,9 +280,10 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                 <div
                   key={idx}
                   style={{ height: `${LINE_HEIGHT}px` }}
-                  className="flex items-center justify-center px-2 text-[10px] font-code text-slate-600 border-y border-[#181926]/50 bg-[#0d0e17]/50"
+                  className="flex items-center justify-center px-1 sm:px-2 text-[10px] font-code text-slate-600 border-y border-[#181926]/50 bg-[#0d0e17]/50"
                 >
-                  <span>── Salto Estrofa ──</span>
+                  <span className="md:inline hidden">── Salto Estrofa ──</span>
+                  <span className="md:hidden inline text-slate-600">──</span>
                 </div>
               );
             }
@@ -300,52 +305,35 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
               <div
                 key={idx}
                 style={{ height: `${LINE_HEIGHT}px` }}
-                className="flex items-center justify-between px-3 group hover:bg-[#131422] transition-colors gap-1.5"
+                className="flex items-center justify-center md:justify-between px-1 md:px-3 group hover:bg-[#131422] transition-colors"
               >
-                {/* Bar Number & Timestamp Tag Badge */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[11px] font-code font-bold text-slate-500 group-hover:text-amber-400 transition-colors w-7 shrink-0">
-                    #{String(barNum).padStart(2, '0')}
+                {/* Mobile View: Compact vertical pill */}
+                <div className="flex flex-col items-center justify-center md:hidden w-full relative">
+                  <span className="text-[10px] font-code font-bold text-slate-500 leading-none mb-0.5">
+                    #{barNum}
                   </span>
-                  <span
-                    className="text-[9px] font-code text-slate-500 hover:text-amber-300 transition-colors cursor-default"
-                    title={`Marca de tiempo: ${timestampTag}`}
-                  >
-                    {timeBadge}
-                  </span>
-                </div>
-
-                {/* Syllable Counter Badge */}
-                <div
-                  className="flex items-center gap-1 px-1.5 py-0.5 bg-[#141524] border border-[#232538] rounded text-[10px] font-code text-slate-300 shrink-0"
-                  title={`Métrica: ${syllables} sílabas con sinalefas`}
-                >
-                  <span className="text-cyan-400 font-bold">{syllables}</span>
-                  <span className="text-[9px] text-slate-500 font-urban-heading">síl</span>
-                </div>
-
-                {/* Flow Switch Badge */}
-                <div className="relative shrink-0">
                   <button
                     onClick={() => setActiveSelectorLine(activeSelectorLine === idx ? null : idx)}
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-code font-bold border transition-all cursor-pointer ${markerCfg.bg} ${markerCfg.color} ${markerCfg.border}`}
-                    title={`Flow rítmico: ${markerCfg.label} (Clic para cambiar)`}
+                    className="text-[10px] font-code font-bold text-cyan-400 active:text-amber-400 transition-colors flex items-center justify-center gap-0.5 cursor-pointer leading-none"
+                    title={`Métrica: ${syllables} sílabas. Flow: ${markerCfg.label} (Toca para cambiar)`}
                   >
-                    <span>{markerCfg.badge}</span>
-                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                    <span>{syllables}s</span>
+                    {marker !== 'default' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    )}
                   </button>
 
-                  {/* Flow Dropdown */}
+                  {/* Flow Dropdown on Mobile */}
                   {activeSelectorLine === idx && (
                     <>
                       <div
-                        className="fixed inset-0 z-40 cursor-default"
+                        className="fixed inset-0 z-50 cursor-default bg-black/60 backdrop-blur-xs"
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveSelectorLine(null);
                         }}
                       />
-                      <div className="absolute left-0 top-full mt-1 z-50">
+                      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 shadow-2xl">
                         <FlowMarkerSelector
                           currentMarker={marker}
                           onChange={(newMarker) => {
@@ -359,25 +347,85 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                   )}
                 </div>
 
-                {/* Special Rap Technique Indicator: Alliteration or Retruécano */}
-                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                  {alliteration && (
-                    <span
-                      className="px-1 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 text-[9px] font-code font-bold truncate shrink-0"
-                      title={`Aliteración: repetición del sonido "${alliteration.sound}" (${alliteration.count} veces)`}
-                    >
-                      alit:"{alliteration.sound}"
+                {/* Desktop View: Full rich layout */}
+                <div className="hidden md:flex items-center justify-between w-full gap-1.5">
+                  {/* Bar Number & Timestamp Tag Badge */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-code font-bold text-slate-500 group-hover:text-amber-400 transition-colors w-7 shrink-0">
+                      #{String(barNum).padStart(2, '0')}
                     </span>
-                  )}
-                  {mirror && (
                     <span
-                      className="px-1 py-0.5 rounded bg-rose-950/60 border border-rose-500/40 text-rose-400 text-[9px] font-code font-bold truncate shrink-0 flex items-center gap-0.5"
-                      title={`${mirror.detail} (con barra #${mirror.partnerLine})`}
+                      className="text-[9px] font-code text-slate-500 hover:text-amber-300 transition-colors cursor-default"
+                      title={`Marca de tiempo: ${timestampTag}`}
                     >
-                      <Repeat className="w-2.5 h-2.5" />
-                      <span>⇄#{mirror.partnerLine}</span>
+                      {timeBadge}
                     </span>
-                  )}
+                  </div>
+
+                  {/* Syllable Counter Badge */}
+                  <div
+                    className="flex items-center gap-1 px-1.5 py-0.5 bg-[#141524] border border-[#232538] rounded text-[10px] font-code text-slate-300 shrink-0"
+                    title={`Métrica: ${syllables} sílabas con sinalefas`}
+                  >
+                    <span className="text-cyan-400 font-bold">{syllables}</span>
+                    <span className="text-[9px] text-slate-500 font-urban-heading">síl</span>
+                  </div>
+
+                  {/* Flow Switch Badge */}
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setActiveSelectorLine(activeSelectorLine === idx ? null : idx)}
+                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-code font-bold border transition-all cursor-pointer ${markerCfg.bg} ${markerCfg.color} ${markerCfg.border}`}
+                      title={`Flow rítmico: ${markerCfg.label} (Clic para cambiar)`}
+                    >
+                      <span>{markerCfg.badge}</span>
+                      <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                    </button>
+
+                    {/* Flow Dropdown */}
+                    {activeSelectorLine === idx && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 cursor-default"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSelectorLine(null);
+                          }}
+                        />
+                        <div className="absolute left-0 top-full mt-1 z-50">
+                          <FlowMarkerSelector
+                            currentMarker={marker}
+                            onChange={(newMarker) => {
+                              onFlowMarkerChange(idx, newMarker);
+                              setActiveSelectorLine(null);
+                            }}
+                            onClose={() => setActiveSelectorLine(null)}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Special Rap Technique Indicator: Alliteration or Retruécano */}
+                  <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                    {alliteration && (
+                      <span
+                        className="px-1 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 text-[9px] font-code font-bold truncate shrink-0"
+                        title={`Aliteración: repetición del sonido "${alliteration.sound}" (${alliteration.count} veces)`}
+                      >
+                        alit:"{alliteration.sound}"
+                      </span>
+                    )}
+                    {mirror && (
+                      <span
+                        className="px-1 py-0.5 rounded bg-rose-950/60 border border-rose-500/40 text-rose-400 text-[9px] font-code font-bold truncate shrink-0 flex items-center gap-0.5"
+                        title={`${mirror.detail} (con barra #${mirror.partnerLine})`}
+                      >
+                        <Repeat className="w-2.5 h-2.5" />
+                        <span>⇄#{mirror.partnerLine}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -389,7 +437,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
           {/* Layer 1: Mirror Highlight Canvas (directly under typing caret) */}
           <div
             ref={mirrorRef}
-            className="absolute inset-0 p-4 font-code text-[15px] select-none pointer-events-none overflow-hidden whitespace-pre"
+            className="absolute inset-0 p-2.5 sm:p-4 font-code text-[15px] select-none pointer-events-none overflow-hidden whitespace-pre"
             style={{
               lineHeight: `${LINE_HEIGHT}px`,
               fontFamily: "'Space Mono', monospace"
@@ -422,7 +470,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
             autoComplete="off"
             autoCorrect="off"
             placeholder="Escribe tus rimas aquí... Al pulsar espacio o enter se colorearán las rimas A-color a, B-color b en el mismo sitio... Usa Ctrl+Espacio para el beat y Ctrl+S para guardar."
-            className="absolute inset-0 w-full h-full p-4 bg-transparent text-transparent caret-amber-400 font-code text-[15px] resize-none outline-none overflow-auto whitespace-pre selection:bg-amber-400/30 selection:text-transparent"
+            className="absolute inset-0 w-full h-full p-2.5 sm:p-4 bg-transparent text-transparent caret-amber-400 font-code text-[15px] resize-none outline-none overflow-auto whitespace-pre selection:bg-amber-400/30 selection:text-transparent"
             style={{
               lineHeight: `${LINE_HEIGHT}px`,
               fontFamily: "'Space Mono', monospace"
@@ -433,7 +481,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
         {/* RIGHT GUTTER: Compound Rhyme Schemes (e.g. CB, BC, AA, A) */}
         <div
           ref={gutterRightRef}
-          className="w-24 md:w-32 bg-[#0b0c14] border-l border-[#1f2130] shrink-0 overflow-hidden select-none py-4"
+          className="w-8 sm:w-12 md:w-32 bg-[#0b0c14] border-l border-[#1f2130] shrink-0 overflow-hidden select-none py-4"
         >
           {lines.map((lineText, idx) => {
             const isBlank = lineText.trim().length === 0;
@@ -457,10 +505,10 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
               <div
                 key={idx}
                 style={{ height: `${LINE_HEIGHT}px` }}
-                className="flex items-center justify-center px-2 group hover:bg-[#131422] transition-colors"
+                className="flex items-center justify-center px-1 sm:px-2 group hover:bg-[#131422] transition-colors"
               >
                 {hasRhyme ? (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 sm:gap-1">
                     {/* Render each letter of the barScheme (e.g. 'C' and 'B' for 'CB') */}
                     {barScheme.split('').map((char, charIdx) => {
                       const colorDef = getColorForLetter(char);
@@ -477,7 +525,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                             borderColor: colorDef.border,
                             color: isHovered ? '#000000' : colorDef.text
                           }}
-                          className={`w-6 h-6 rounded border text-[11px] font-urban-display font-bold flex items-center justify-center transition-all cursor-pointer ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded border text-[10px] sm:text-[11px] font-urban-display font-bold flex items-center justify-center transition-all cursor-pointer ${
                             isHovered ? 'scale-110 shadow-md shadow-amber-400/30 font-extrabold' : ''
                           } ${isChiasmus ? 'ring-1 ring-rose-400/80 ring-offset-1 ring-offset-[#0b0c14]' : ''}`}
                           title={`Familia ${char} (Esquema de barra: ${barScheme})`}
@@ -489,19 +537,60 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
 
                     {/* Badge if it's a mirror/chiasmus line */}
                     {isChiasmus && (
-                      <span className="text-[9px] text-rose-400 font-bold ml-0.5" title="Quiasmo rítmico (esquema en espejo)">
+                      <span className="hidden sm:inline text-[9px] text-rose-400 font-bold ml-0.5" title="Quiasmo rítmico (esquema en espejo)">
                         ⇄
                       </span>
                     )}
                   </div>
                 ) : (
-                  <span className="text-[11px] font-code text-slate-700">
+                  <span className="text-[10px] sm:text-[11px] font-code text-slate-700">
                     -
                   </span>
                 )}
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Mobile Quick Action Dock (Thumb-friendly controls) */}
+      <div className="md:hidden flex items-center justify-between px-3 py-2 bg-[#0d0e17]/95 backdrop-blur-md border-t border-[#1f2130] shrink-0 text-xs gap-2 pb-safe">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onUndo}
+            disabled={!_canUndo}
+            className="p-2 rounded-lg bg-[#141524] text-slate-300 active:bg-amber-400/20 disabled:opacity-30 transition-colors border border-[#232538] flex items-center justify-center cursor-pointer"
+            title="Deshacer (Cmd+Z / Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!_canRedo}
+            className="p-2 rounded-lg bg-[#141524] text-slate-300 active:bg-amber-400/20 disabled:opacity-30 transition-colors border border-[#232538] flex items-center justify-center cursor-pointer"
+            title="Rehacer (Cmd+Shift+Z / Ctrl+Y)"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleAddBar}
+            className="px-2.5 py-1.5 rounded-lg bg-[#1a1c2b] active:bg-[#25283d] text-amber-400 font-urban-heading font-bold border border-amber-400/30 flex items-center gap-1 text-[11px] cursor-pointer"
+            title="Añadir nueva barra"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Barra</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => rapAudioEngine.toggle()}
+            className="px-2.5 py-1.5 rounded-lg bg-[#141524] active:bg-[#1f2134] text-white font-code border border-[#232538] flex items-center gap-1.5 text-[11px] cursor-pointer"
+            title="Play / Pausa Beat & Metrónomo"
+          >
+            <Play className="w-3 h-3 text-cyan-400 fill-cyan-400" />
+            <span>{bpm} BPM</span>
+          </button>
         </div>
       </div>
     </div>

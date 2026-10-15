@@ -59,3 +59,18 @@
   transform: translateY(-1px);
   filter: brightness(1.2);
 }
+
+/* Mobile safe area padding for notched and bar phones */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+/* Prevent double-tap zoom delay on mobile action buttons */
+button, a {
+  touch-action: manipulation;
+}
+
