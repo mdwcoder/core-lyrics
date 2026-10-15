@@ -28,7 +28,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[#232536] bg-[#0d0e16]/95 backdrop-blur-md sticky top-0 z-40">
       {/* Zone 1: Single text element wordmark */}
       <div className="flex items-center gap-3 shrink-0">
-        <a href="/" className="flex items-center gap-2 group text-decoration-none">
+        <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2 group text-decoration-none cursor-default">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 via-rose-500 to-cyan-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-amber-500/10">
             <div className="w-full h-full bg-[#0a0b10] rounded-[6px] flex items-center justify-center">
               <Music2 className="w-4 h-4 text-amber-400" />

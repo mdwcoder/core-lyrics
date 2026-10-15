@@ -85,6 +85,18 @@
 
 ---
 
+## ☁️ Despliegue en Vercel
+
+El proyecto incluye archivo de configuración [`vercel.json`](vercel.json) optimizado para Vercel:
+
+- **Despliegue independiente**: Importa el repositorio directamente en Vercel. Detectará Vite automáticamente (`Build Command: npm run build`, `Output Directory: dist`).
+- **Integrado en otro proyecto desplegado (subruta / monorepo / rewrites)**:
+  - Las rutas de los assets compilados son relativas (`base: './'`), lo que permite servirlo en subrutas (ej. `/lyrics`, `/apps/core-lyrics`) sin romper estilos ni scripts.
+  - Si tu proyecto principal utiliza rewrites de Next.js o Vercel, puedes enrutar directamente a la compilación o directorio de CoreLyrics.
+  - Opcionalmente puedes definir la variable de entorno `VITE_BASE_PATH` (ej. `VITE_BASE_PATH="/lyrics/"`) si tu setup requiere una ruta base absoluta específica.
+
+---
+
 ## 📦 Stack Tecnológico
 
 - **React 19**
