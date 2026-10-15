@@ -124,6 +124,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                 <kbd className="px-2 py-0.5 bg-[#1d1f33] rounded font-code text-cyan-300 font-bold">Ctrl + S</kbd>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#141624] border border-[#26283c]">
+                <span className="text-slate-400">Deshacer (Undo)</span>
+                <kbd className="px-2 py-0.5 bg-[#1d1f33] rounded font-code text-amber-400 font-bold">Cmd+Z / Ctrl+Z</kbd>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#141624] border border-[#26283c]">
+                <span className="text-slate-400">Rehacer (Redo)</span>
+                <kbd className="px-2 py-0.5 bg-[#1d1f33] rounded font-code text-amber-400 font-bold">Cmd+Shift+Z / Ctrl+Y</kbd>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#141624] border border-[#26283c]">
                 <span className="text-slate-400">Crear nueva barra</span>
                 <kbd className="px-2 py-0.5 bg-[#1d1f33] rounded font-code text-white">Enter</kbd>
               </div>

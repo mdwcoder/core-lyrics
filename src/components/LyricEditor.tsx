@@ -27,6 +27,10 @@ interface LyricEditorProps {
   onManualSave?: () => void;
   bpm?: number;
   timeOffset?: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 const LINE_HEIGHT = 46; // Fixed line height for 100% synchronized gutter & in-place highlight
@@ -41,7 +45,11 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
   onRhymeHover,
   onManualSave,
   bpm = 90,
-  timeOffset = 0
+  timeOffset = 0,
+  canUndo: _canUndo = false,
+  canRedo: _canRedo = false,
+  onUndo,
+  onRedo
 }) => {
   const [activeSelectorLine, setActiveSelectorLine] = useState<number | null>(null);
 
@@ -98,6 +106,27 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
       e.preventDefault();
       onManualSave?.();
       return;
+    }
+
+    // Undo: Cmd+Z (Mac) or Ctrl+Z (PC/Linux)
+    // Redo: Cmd+Shift+Z (Mac) or Ctrl+Shift+Z / Ctrl+Y (PC/Linux)
+    const isZ = e.key === 'z' || e.key === 'Z';
+    const isY = e.key === 'y' || e.key === 'Y';
+    const isModifier = e.metaKey || e.ctrlKey;
+
+    if (isModifier && !e.altKey) {
+      if ((e.shiftKey && isZ) || (!e.metaKey && !e.shiftKey && isY)) {
+        e.preventDefault();
+        e.stopPropagation();
+        onRedo?.();
+        return;
+      }
+      if (!e.shiftKey && isZ) {
+        e.preventDefault();
+        e.stopPropagation();
+        onUndo?.();
+        return;
+      }
     }
 
     // Escape closes flow marker dropdown

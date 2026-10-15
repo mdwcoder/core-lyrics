@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileText, Sparkles, Clock, Music2, HelpCircle, UploadCloud } from 'lucide-react';
+import { Download, FileText, Sparkles, Clock, Music2, HelpCircle, UploadCloud, Undo2, Redo2 } from 'lucide-react';
 
 interface TopBarProps {
   onNewSong: () => void;
@@ -11,6 +11,10 @@ interface TopBarProps {
   onToggleTimeline: () => void;
   totalBars: number;
   totalSyllables: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -22,11 +26,15 @@ export const TopBar: React.FC<TopBarProps> = ({
   isTimelineOpen,
   onToggleTimeline,
   totalBars: _totalBars,
-  totalSyllables: _totalSyllables
+  totalSyllables: _totalSyllables,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo
 }) => {
   return (
     <header className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[#232536] bg-[#0d0e16]/95 backdrop-blur-md sticky top-0 z-40">
-      {/* Zone 1: Single text element wordmark */}
+      {/* Zone 1: Wordmark & Undo/Redo quick actions */}
       <div className="flex items-center gap-3 shrink-0">
         <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2 group text-decoration-none cursor-default">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 via-rose-500 to-cyan-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-amber-500/10">
@@ -38,6 +46,26 @@ export const TopBar: React.FC<TopBarProps> = ({
             CORE<span className="text-amber-400">LYRICS</span>
           </span>
         </a>
+
+        {/* Undo / Redo Buttons */}
+        <div className="flex items-center gap-1 border-l border-[#232536] pl-2.5 ml-1">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 text-slate-400 p-1.5 rounded hover:bg-[#1a1c2b] transition-colors cursor-pointer disabled:cursor-default"
+            title="Deshacer (Cmd+Z en Mac / Ctrl+Z en PC)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 text-slate-400 p-1.5 rounded hover:bg-[#1a1c2b] transition-colors cursor-pointer disabled:cursor-default"
+            title="Rehacer (Cmd+Shift+Z en Mac / Ctrl+Shift+Z / Ctrl+Y en PC)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Zone 2: Navigation links / actions */}
@@ -65,7 +93,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             onClick={onImportClick}
             className="hover:text-white transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer text-xs uppercase tracking-wider p-1 sm:p-0"
-            title="Importar proyecto JSON"
+            title="Importar proyecto JSON o texto con marcas //-//"
           >
             <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden md:inline">Importar</span>
